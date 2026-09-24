@@ -2,12 +2,10 @@
 Code and data used for analysis of data in paper quantifying tail flaring among seven species of of hummingbirds during agonism. 
 
 ## Organization 
-0_data: raw data, unprocessed and directly from qualitative tables or kinematic analysis of tail angles. 
+Raw data available at Dryad repository: 10.5061/dryad.dz08kpsbj
 1_code: all code used to analyze data. 0_ prefix is for initial data processing, 1_ is for further processing, 3_ and 4_ are for statistics and visualizations
-2_incremental: updated .csv files exported after 0_data is processed with 0_ codes
-3_results: summary figures and tables. 
 
-## Usage
+## Code Usage
 0_data_onboarding: uploads and cleans all data 
 0_tail_dfs: further cleaning and subsetting of tail angles of Calliope hummingbirds' tail angles in lab trials
 1_fight_qual_analysis_prep: improving coding structure of qualitative descriptions of all lab fight trials. 
@@ -20,12 +18,13 @@ Code and data used for analysis of data in paper quantifying tail flaring among 
 1_tail_angles.m : MATLAB code to process tail angles from 3D cordinates of tail points
 
 
-## License
-MIT License (or specify your license)
-
 ## Author
 Rosalee Elting - rosalee.elting@gmail.com
-Project Link: https://github.com/eltingrosalee/JEB_tail_flaring_agonism
+https://github.com/eltingrosalee/JEB_tail_flaring_agonism_public
 
 For use of data, please cite 
-## https://doi.org/10.64898/2026.01.30.702386
+Tail flaring during agonism in Hummingbirds
+Authors:
+Rosalee Elting, Md Zafar Anwar, Donald R Powers, Bo Cheng, Haoxiang Luo, Bret W Tobalske
+Journal of Experimental Biology, 2026
+## https://doi.org/10.1242/jeb.253064
