@@ -1,0 +1,114 @@
+---
+title: "1_frontal_area_report"
+author: "Rosalee Elting"
+date: "2025-10-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries 
+```{r}
+library(dplyr)
+library(tidyverse)
+library(lme4)
+library(rstatix)
+```
+
+# load data 
+```{r}
+body_mass_adj <- read.csv("./0_data/body_mass_adj.csv")
+```
+bird_area df should be loaded first from 0_data_onboarding code
+
+
+# Calculate frontal areas and proportions
+```{r}
+bird_area_props <- bird_area %>% 
+  rename(bird_id = X) %>% 
+  select(-comments) %>% 
+  mutate(area_relax = body_area_wo_tail + tail_area_relax, 
+         area_flare = body_area_wo_tail + tail_area_flared, 
+         inc_size = (area_flare/area_relax)-1)
+```
+
+# Reporting averages
+```{r}
+mean(bird_area_props$area_relax)
+sd(bird_area_props$area_relax)
+mean(bird_area_props$area_flare)
+sd(bird_area_props$area_flare)
+mean(bird_area_props$inc_size)
+sd(bird_area_props$inc_size)
+```
+
+# Stats to see if flare state increases perceived size 
+So, using a Wilcoxson signed rank test (non-parametric equivalent of a t-test)
+testing difference in body area with relaxed vs flared tail 
+```{r}
+relax <- bird_area_props$area_relax
+flare <- bird_area_props$area_flare
+
+wilcox.test(relax, flare, paired = TRUE, alternative = "less") # expect the data to be less in relaxed than flared
+```
+p-value = 0.0009766
+
+Calculate effect size 
+```{r}
+# combine into a data frame first
+df <- data.frame(
+  value     = c(relax, flare),
+  condition = rep(c("relax", "flare"), each = 10),
+  bird      = rep(1:10, 2)
+)
+wilcox_effsize(df, value ~ condition, paired = TRUE)
+```
+Effect size, r= 0.886, large effect size. 
+
+# Stats to see if increase in perceived size due to body mass
+This would be an estimate if this is an "index signal" 
+These data are from 1_body_mass_RHP.Rmd file 
+The data frame is body_mass_adj, which is a series of log-transformed body masses for the whole summer's worth of measures. 
+
+```{r}
+individuals <- c("CH47", "CH48", "CH49", "CH50", "CH51", "CH52", "CH53", "CH54", "CH55", "CH56")
+
+mass_summary <- body_mass_adj %>% 
+  filter(bird_id %in% individuals) %>% 
+  filter(fight_day == "y") %>% # don't need W/L even, but want to use a time frame where fights were occurring. 
+  group_by(bird_id) %>% 
+  reframe(mean_mass = mean(mass),
+          sd_mass = sd(mass))
+```
+Mass summary to report in paper 
+```{r}
+paper_mass <- body_mass_adj %>% 
+  filter(bird_id %in% individuals) %>% 
+  filter(fight_day == "y")
+
+```
+Test to see if the tail size is correlated with body size. 
+Using flared tail area to test prediction 
+```{r}
+# merging df to ensure the order of bird_id is the same for paired test 
+flare_mass_data <- left_join(
+  mutate(bird_area_props, join_key = tolower(bird_id)),
+  mutate(mass_summary, join_key = tolower(bird_id)),
+  by = "join_key"
+) %>%
+  select(-join_key) %>% 
+  mutate(bird_id = bird_id.x)
+
+# paired data now in vectors 
+flare <- flare_mass_data$tail_area_flared
+mass <- flare_mass_data$mean_mass
+```
+
+```{r}
+cor.test(mass, flare, method = "spearman")
+```
+rho = -0.2, p-value = 0.5835
+
+

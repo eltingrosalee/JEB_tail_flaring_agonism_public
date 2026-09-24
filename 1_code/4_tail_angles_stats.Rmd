@@ -1,0 +1,691 @@
+---
+title: "1_tail_angles_stats"
+author: "Rosalee Elting"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+    code_folding: show
+  pdf_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Read Data 
+```{r}
+tail_angles_sub <- read.csv("./2_incremental/tail_angles_sub.csv")
+tail_angles_long <- read.csv("./2_incremental/tail_angles_long.csv")
+```
+
+# Models
+```{r}
+library(dplyr)
+library(lme4)
+library(tidyverse)
+library(plotrix)
+library(rstatix)
+```
+
+
+# Updated Models 
+Starting by understanding the distribution of all the data, as well as the subset data
+
+```{r}
+ggplot(tail_angles_long, aes(x = angle)) + 
+  geom_histogram()
+
+ggplot(tail_angles_sub, aes(x = angle)) + 
+  geom_histogram()
+```
+Both data sets have a left-skewed data distribution that goes on both sides of zero (many tail angles are sub zero)
+
+T-tests of any form should be normally distributed, but with large sample sizes they are often robust enough. Starting with some t-tests. 
+
+
+# Test 1: Wilcoxon's Signed Rank Paired t-test
+To use an individual bird's mean tail angle for a takeoff compared to a competition 
+Making data frames for each bird's take off and landing score. 
+
+## Pooled: TO+LA vs Comp 
+```{r}
+solitary <- c("takeoff", "landing")
+
+# bird 49
+  ch49_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch49") %>% 
+    select(angle)
+  ch49_so <- ch49_so[[1]]
+  
+  ch49_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch49") %>% 
+    select(angle)
+  ch49_co <- ch49_co[[1]]
+  b1_so <- mean(ch49_so)
+  b1_co <- mean(ch49_co)
+
+# bird 51
+  ch51_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch51") %>% 
+    select(angle)
+  ch51_so <- ch51_so[[1]]
+  
+  ch51_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch51") %>% 
+    select(angle)
+  ch51_co <- ch51_co[[1]]
+  b2_so <- mean(ch51_so)
+  b2_co <- mean(ch51_co)
+  
+# bird 47
+  ch47_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch47") %>% 
+    select(angle)
+  ch47_so <- ch47_so[[1]]
+  
+  ch47_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch47") %>% 
+    select(angle)
+  ch47_co <- ch47_co[[1]]
+  b3_so <- mean(ch47_so)
+  b3_co <- mean(ch47_co)
+  
+# bird 48
+  ch48_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch48") %>% 
+    select(angle)
+  ch48_so <- ch48_so[[1]]
+  
+  ch48_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch48") %>% 
+    select(angle)
+  ch48_co <- ch48_co[[1]]
+  b4_so <- mean(ch48_so)
+  b4_co <- mean(ch48_co)
+  
+# bird 50 
+  ch50_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch50") %>% 
+    select(angle)
+  ch50_so <- ch50_so[[1]]
+  
+  ch50_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch50") %>% 
+    select(angle)
+  ch50_co <- ch50_co[[1]]
+  b5_so <- mean(ch50_so)
+  b5_co <- mean(ch50_co)
+  
+# bird 55
+  ch55_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch55") %>% 
+    select(angle)
+  ch55_so <- ch55_so[[1]]
+  
+  ch55_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch55") %>% 
+    select(angle)
+  ch55_co <- ch55_co[[1]]
+  b6_so <- mean(ch55_so)
+  b6_co <- mean(ch55_co)
+  
+# bird 54
+  ch54_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch54") %>% 
+    select(angle)
+  ch54_so <- ch54_so[[1]]
+  
+  ch54_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch54") %>% 
+    select(angle)
+  ch54_co <- ch54_co[[1]]
+  b7_so <- mean(ch54_so)
+  b7_co <- mean(ch54_co)
+
+# bird 53
+  ch53_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch53") %>% 
+    select(angle)
+  ch53_so <- ch53_so[[1]]
+  
+  ch53_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch53") %>% 
+    select(angle)
+  ch53_co <- ch53_co[[1]]
+  b8_so <- mean(ch53_so)
+  b8_co <- mean(ch53_co)
+  
+# bird 56
+  ch56_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch56") %>% 
+    select(angle)
+  ch56_so <- ch56_so[[1]]
+  
+  ch56_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch56") %>% 
+    select(angle)
+  ch56_co <- ch56_co[[1]]
+  b9_so <- mean(ch56_so)
+  b9_co <- mean(ch56_co)
+  
+# bird 52
+  ch52_so <- tail_angles_sub %>% 
+    filter(treatment %in% solitary) %>% 
+    filter(bird_id == "ch52") %>% 
+    select(angle)
+  ch52_so <- ch52_so[[1]]
+  
+  ch52_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch52") %>% 
+    select(angle)
+  ch52_co <- ch52_co[[1]]
+  b10_so <- mean(ch52_so)
+  b10_co <- mean(ch52_co)
+  
+  
+
+so <- c(b1_so, b2_so, b3_so, b4_so, b5_so, b6_so, b7_so, b8_so, b9_so, b10_so) 
+co <- c(b1_co, b2_co, b3_co, b4_co, b5_co, b6_co, b7_co, b8_co, b9_co, b10_co)
+```
+Testing for differences in the mean for each bird 
+```{r}
+wilcox.test(so, co, paired = TRUE)
+```
+
+# Test 2: Takeoff versus competition 
+```{r}
+# bird 49
+  ch49_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch49") %>% 
+    select(angle)
+  ch49_to <- ch49_to[[1]]
+  
+  ch49_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch49") %>% 
+    select(angle)
+  ch49_co <- ch49_co[[1]]
+  b1_to <- mean(ch49_to)
+  b1_co <- mean(ch49_co)
+
+# bird 51
+  ch51_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch51") %>% 
+    select(angle)
+  ch51_to <- ch51_to[[1]]
+  
+  ch51_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch51") %>% 
+    select(angle)
+  ch51_co <- ch51_co[[1]]
+  b2_to <- mean(ch51_to)
+  b2_co <- mean(ch51_co)
+# bird 47
+  ch47_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch47") %>% 
+    select(angle)
+  ch47_to <- ch47_to[[1]]
+  
+  ch47_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch47") %>% 
+    select(angle)
+  ch47_co <- ch47_co[[1]]
+  b3_to <- mean(ch47_to)
+  b3_co <- mean(ch47_co)
+# bird 48
+  ch48_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch48") %>% 
+    select(angle)
+  ch48_to <- ch48_to[[1]]
+  
+  ch48_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch48") %>% 
+    select(angle)
+  ch48_co <- ch48_co[[1]]
+  b4_to <- mean(ch48_to)
+  b4_co <- mean(ch48_co)
+# bird 50 
+  ch50_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch50") %>% 
+    select(angle)
+  ch50_to <- ch50_to[[1]]
+  
+  ch50_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch50") %>% 
+    select(angle)
+  ch50_co <- ch50_co[[1]]
+  b5_to <- mean(ch50_to)
+  b5_co <- mean(ch50_co)
+
+  # bird 55
+  ch55_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch55") %>% 
+    select(angle)
+  ch55_to <- ch55_to[[1]]
+  
+  ch55_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch55") %>% 
+    select(angle)
+  ch55_co <- ch55_co[[1]]
+  b6_to <- mean(ch55_to)
+  b6_co <- mean(ch55_co)
+
+# bird 54
+  ch54_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch54") %>% 
+    select(angle)
+  ch54_to <- ch54_to[[1]]
+  
+  ch54_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch54") %>% 
+    select(angle)
+  ch54_co <- ch54_co[[1]]
+  b7_to <- mean(ch54_to)
+  b7_co <- mean(ch54_co)
+
+# bird 53
+  ch53_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch53") %>% 
+    select(angle)
+  ch53_to <- ch53_to[[1]]
+  
+  ch53_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch53") %>% 
+    select(angle)
+  ch53_co <- ch53_co[[1]]
+  b8_to <- mean(ch53_to)
+  b8_co <- mean(ch53_co)
+
+# bird 56
+  ch56_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch56") %>% 
+    select(angle)
+  ch56_to <- ch56_to[[1]]
+  
+  ch56_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch56") %>% 
+    select(angle)
+  ch56_co <- ch56_co[[1]]
+  b9_to <- mean(ch56_to)
+  b9_co <- mean(ch56_co)
+
+# bird 52
+  ch52_to <- tail_angles_sub %>% 
+    filter(treatment == "takeoff") %>% 
+    filter(bird_id == "ch52") %>% 
+    select(angle)
+  ch52_to <- ch52_to[[1]]
+  
+  ch52_co <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(bird_id == "ch52") %>% 
+    select(angle)
+  ch52_co <- ch52_co[[1]]
+  b10_to <- mean(ch52_to)
+  b10_co <- mean(ch52_co)
+
+to <- c(b1_to, b2_to, b3_to, b4_to, b5_to, b6_to, b7_to, b8_to, b9_to, b10_to) 
+co <- c(b1_co, b2_co, b3_co, b4_co, b5_co, b6_co, b7_co, b8_co, b9_co, b10_co)
+```
+
+
+Testing for differences in the mean for each bird 
+```{r}
+wilcox.test(to, co, paired = TRUE, alternative = "less")
+```
+This tests the directional hypothesis that our a priori expectation would be for competition to be greater than landing. 
+
+## Test 2 effect size
+I want to obtain an effect size, so using an alternative R package for the same test. 
+```{r}
+# combine into a data frame first
+df <- data.frame(
+  value     = c(to, co),
+  condition = rep(c("takeoff", "competition"), each = 10),
+  bird      = rep(1:10, 2)
+)
+wilcox_effsize(df, value ~ condition, paired = TRUE)
+```
+This is a large effect size of 0.886, so not only SS but a large magnitude difference using rank-biserial correlation
+
+# Test 3: Takeoff versus landing 
+
+```{r}
+# bird 49
+  ch49_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch49") %>% 
+    select(angle)
+  ch49_la <- ch49_la[[1]]
+b1_la <- mean(ch49_la)
+
+
+# bird 51
+  ch51_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch51") %>% 
+    select(angle)
+  ch51_la <- ch51_la[[1]]
+b2_la <- mean(ch51_la)
+
+# bird 47
+  ch47_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch47") %>% 
+    select(angle)
+  ch47_la <- ch47_la[[1]]
+b3_la <- mean(ch47_la)
+
+# bird 48
+  ch48_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch48") %>% 
+    select(angle)
+  ch48_la <- ch48_la[[1]]
+b4_la <- mean(ch48_la)
+
+# bird 50 
+  ch50_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch50") %>% 
+    select(angle)
+  ch50_la <- ch50_la[[1]]
+b5_la <- mean(ch50_la)
+
+# bird 55
+  ch55_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch55") %>% 
+    select(angle)
+  ch55_la <- ch55_la[[1]]
+b6_la <- mean(ch55_la)
+
+# bird 54
+  ch54_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch54") %>% 
+    select(angle)
+  ch54_la <- ch54_la[[1]]
+b7_la <- mean(ch54_la)
+
+# bird 53
+  ch53_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch53") %>% 
+    select(angle)
+  ch53_la <- ch53_la[[1]]
+b8_la <- mean(ch53_la)
+
+# bird 56
+  ch56_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch56") %>% 
+    select(angle)
+  ch56_la <- ch56_la[[1]]
+b9_la <- mean(ch56_la)
+
+# bird 52
+  ch52_la <- tail_angles_sub %>% 
+    filter(treatment == "landing") %>% 
+    filter(bird_id == "ch52") %>% 
+    select(angle)
+  ch52_la <- ch52_la[[1]]
+b10_la <- mean(ch52_la)
+
+la <- c(b1_la, b2_la, b3_la, b4_la, b5_la, b6_la, b7_la, b8_la, b9_la, b10_la)
+
+```
+
+```{r}
+wilcox.test(to, la, paired = TRUE)
+```
+## Test 3 effect size
+
+```{r}
+# combine into a data frame first
+df <- data.frame(
+  value     = c(to, la),
+  condition = rep(c("takeoff", "landing"), each = 10),
+  bird      = rep(1:10, 2)
+)
+wilcox_effsize(df, value ~ condition, paired = TRUE)
+```
+The effect size here is quite small, 0.0483. 
+
+# Test 4: winning versus losing 
+
+```{r}
+# bird 49
+ch49_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch49") %>% 
+    select(angle)
+  ch49_l <- ch49_l[[1]]
+  
+ch49_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch49") %>% 
+    select(angle)
+ch49_w <- ch49_w[[1]]
+  b1_w <- mean(ch49_w)
+  b1_l <- mean(ch49_l)
+
+# bird 51
+ch51_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch51") %>% 
+    select(angle)
+  ch51_l <- ch51_l[[1]]
+  
+ch51_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch51") %>% 
+    select(angle)
+ch51_w <- ch51_w[[1]]
+
+b2_w <- mean(ch51_w)
+b2_l <- mean(ch51_l)
+  
+# bird 47
+ch47_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch47") %>% 
+    select(angle)
+  ch47_l <- ch47_l[[1]]
+  
+ch47_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch47") %>% 
+    select(angle)
+ch47_w <- ch47_w[[1]]
+
+b3_w <- mean(ch47_w)
+b3_l <- mean(ch47_l)
+# bird 48
+  ch48_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch48") %>% 
+    select(angle)
+  ch48_l <- ch48_l[[1]]
+  
+ch48_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch48") %>% 
+    select(angle)
+ch48_w <- ch48_w[[1]]
+
+b4_w <- mean(ch48_w)
+b4_l <- mean(ch48_l)
+# bird 50 
+  ch50_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch50") %>% 
+    select(angle)
+  ch50_l <- ch50_l[[1]]
+  
+ch50_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch50") %>% 
+    select(angle)
+ch50_w <- ch50_w[[1]]
+
+b5_w <- mean(ch50_w)
+b5_l <- mean(ch50_l)
+
+# bird 55
+ch55_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch55") %>% 
+    select(angle)
+  ch55_l <- ch55_l[[1]]
+  
+ch55_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch55") %>% 
+    select(angle)
+ch55_w <- ch55_w[[1]]
+b6_w <- mean(ch55_w)
+b6_l <- mean(ch55_l)
+
+# bird 54
+ch54_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch54") %>% 
+    select(angle)
+  ch54_l <- ch54_l[[1]]
+  
+ch54_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch54") %>% 
+    select(angle)
+ch54_w <- ch54_w[[1]]
+b7_w <- mean(ch54_w)
+b7_l <- mean(ch54_l)
+
+# bird 53
+ch53_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch53") %>% 
+    select(angle)
+  ch53_l <- ch53_l[[1]]
+  
+ch53_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch53") %>% 
+    select(angle)
+ch53_w <- ch53_w[[1]]
+b8_w <- mean(ch53_w)
+b8_l <- mean(ch53_l)
+
+# bird 56
+ch56_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch56") %>% 
+    select(angle)
+  ch56_l <- ch56_l[[1]]
+  
+ch56_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch56") %>% 
+    select(angle)
+ch56_w <- ch56_w[[1]]
+b9_w <- mean(ch56_w)
+b9_l <- mean(ch56_l)
+
+# bird 52
+ch52_l <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "loss") %>%
+    filter(bird_id == "ch52") %>% 
+    select(angle)
+  ch52_l <- ch52_l[[1]]
+  
+ch52_w <- tail_angles_sub %>% 
+    filter(treatment == "competition") %>% 
+    filter(outcome == "win") %>%
+    filter(bird_id == "ch52") %>% 
+    select(angle)
+ch52_w <- ch52_w[[1]]
+b10_w <- mean(ch52_w)
+b10_l <- mean(ch52_l)
+
+w <- c(b1_w, b2_w, b3_w, b4_w, b5_w, b6_w, b7_w, b8_w, b9_w, b10_w) 
+l <- c(b1_l, b2_l, b3_l, b4_l, b5_l, b6_l, b7_l, b8_l, b9_l, b10_l)
+
+```
+
+We can use one tailed to test the prediction that angles will be larger in winners than losers 
+Testing with a priori expectation it will be larger in winners than losers 
+
+```{r}
+wilcox.test(w, l, paired = TRUE, alternative = "greater")
+```
+
+## Test 4 Effect size
+```{r}
+# combine into a data frame first
+df <- data.frame(
+  value     = c(w, l),
+  condition = rep(c("win", "loss"), each = 10),
+  bird      = rep(1:10, 2)
+)
+wilcox_effsize(df, value ~ condition, paired = TRUE)
+```

@@ -1,0 +1,259 @@
+---
+title: "1_tail_angles_viz"
+author: "Rosalee Elting"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+    code_folding: show
+  pdf_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Intro 
+For 2024 and 2025 birds, with a representative of a win, loss, takeoff and landing from each individual 
+with data frames prepared in 0_tail_dfs.Rmd 
+
+# Libraries
+```{r, include=FALSE}
+library(tidyverse)
+library(ggExtra)
+library(here)
+library(knitr)
+library(pracma)
+library(MetBrewer)
+library(zoo)
+library(ggsignif)
+library(ggnewscale)
+```
+
+# Load Data 
+load data if not already in environment. 
+Need data further processed form 0_tail_dfs. 
+
+```{r, include = FALSE}
+tail_angles_long <- read.csv("C:/Users/rosal/Documents/R/ProcB_TailFlaring/2_incremental/tail_angles_long.csv")
+tail_angles_sub <- read.csv("C:/Users/rosal/Documents/R/ProcB_TailFlaring/2_incremental/tail_angles_sub.csv")
+bird_treatment_angle<- read.csv("C:/Users/rosal/Documents/R/ProcB_TailFlaring/2_incremental/bird_treatment_angle.csv")
+
+```
+# Color Selection
+```{r}
+cat_col <- met.brewer("Nattier")[c(2,3, 5, 7)]
+bird_col <- met.brewer("Juarez", n=10, direction = -1) # formerly Egypt but not enough contrast. 
+contrast_col <- met.brewer("Paquin")[c(3,9)]
+
+# Preview
+par(mfrow=c(3,1))
+scales::show_col(cat_col, labels=FALSE)
+scales::show_col(bird_col, labels=FALSE)
+scales::show_col(contrast_col, labels=FALSE)
+```
+
+# Fig 2: Mean tail spread by 
+Bird's data pooled. As a box plot of means to then add statistical differences in between 
+Stats based on n=10, mean from each individual per condition. 
+
+```{r, message = FALSE, echo = FALSE}
+# Bracket 1: Take off vs. pooled competition
+bracket1_y <- 170      # height of the horizontal bar
+bracket1_drop <- 15   # how far it drops to takeoff box 
+tip1 <- 2          # small tick at right end
+
+# Bracket 2: win vs lose. 
+bracket2_y <- 155       # horizontal bar of these two
+tip2 <- 4     # tick at each end 
+label2_offset <-2 # between bar and label 
+
+# manage palette
+bird_col <- as.character(bird_col)
+names(bird_col) <- paste("Bird", 1:10)
+
+# split into years
+bird_col_y1 <- bird_col[paste("Bird", 1:5)]
+bird_col_y2 <- bird_col[paste("Bird", 6:10)]
+
+# bird id based on bird 1-10 not ch numbers 
+bird_remap <- c(
+  "ch47" = "Bird 1", "ch48" = "Bird 2", "ch49" = "Bird 3",
+  "ch50" = "Bird 4", "ch51" = "Bird 5", "ch52" = "Bird 6",
+  "ch53" = "Bird 7", "ch54" = "Bird 8", "ch55" = "Bird 9", "ch56" = "Bird 10"
+)
+
+# year shapes
+year_shapes <- c(
+  "Bird 1" = 19, "Bird 2" = 19, "Bird 3" = 19, "Bird 4" = 19, "Bird 5" = 19,
+  "Bird 6" = 15,  "Bird 7" = 15,  "Bird 8" = 15,  "Bird 9" = 15,  "Bird 10" = 15
+)
+ # update data frames 
+# Remap bird_id in both dataframes
+tail_angles_sub <- tail_angles_sub %>%
+  mutate(bird_id = recode(bird_id, !!!bird_remap),
+         bird_id = factor(bird_id, levels = paste("Bird", 1:10)),
+         year = ifelse(bird_id %in% paste("Bird", 1:5), "Year 1", "Year 2"))
+
+bird_treatment_angle <- bird_treatment_angle %>%
+  mutate(bird_id = recode(bird_id, !!!bird_remap),
+         bird_id = factor(bird_id, levels = paste("Bird", 1:10)),
+         year = ifelse(bird_id %in% paste("Bird", 1:5), "Year 1", "Year 2"))
+
+bird_treatment_angle %>% # summary from just the n=10 means 
+  ggplot(aes(x= treatment_outcome, y = mean_angle))+ 
+  geom_boxplot(alpha = 0.3, fill="gray80", color= "gray40")+
+  
+  # Year 1 points
+  geom_pointrange(data = filter(bird_treatment_angle, year == "Year 1"),
+                  aes(x = treatment_outcome, y = mean_angle,
+                      ymin = mean_angle - sd_angle,
+                      ymax = mean_angle + sd_angle,
+                      color = bird_id, shape = bird_id),
+                  position = position_jitter(width = 0.15, seed = 123),
+                  size = 0.6, linewidth = 0.7) +
+  scale_color_manual(name = "Year 1", values = bird_col_y1,
+                     labels = paste("Bird", 1:5)) +
+  scale_shape_manual(name = "Year 1", values = setNames(rep(19, 5), paste("Bird", 1:5)),
+                     labels = paste("Bird", 1:5)) +
+  
+  new_scale_color() +
+  new_scale("shape") +
+  
+  # Year 2 points (open circles)
+  geom_pointrange(data = filter(bird_treatment_angle, year == "Year 2"),
+                  aes(x = treatment_outcome, y = mean_angle,
+                      ymin = mean_angle - sd_angle,
+                      ymax = mean_angle + sd_angle,
+                      color = bird_id, shape = bird_id),
+                  position = position_jitter(width = 0.15, seed = 123),
+                  size = 0.6, linewidth = 0.7) +
+  scale_color_manual(name = "Year 2", values = bird_col_y2,
+                     labels = paste("Bird", 6:10)) +
+  scale_shape_manual(name = "Year 2", values = setNames(rep(15, 5), paste("Bird", 6:10)),
+                     labels = paste("Bird", 6:10)) +
+
+  scale_x_discrete(limits = c("Takeoff", "Landing", "Competition (Loss)", "Competition (Win)"), 
+                   labels = c("Competition (Loss)" = "Competition\n(Loss)",
+                              "Competition (Win)" = "Competition\n(Win)",
+                              "Landing" = "Landing",
+                              "Takeoff" = "Takeoff"))+ 
+
+    # bracket 1
+  annotate("segment", x = 1, xend = 3.5, y = bracket1_y, yend = bracket1_y, color = "black") +
+  annotate("segment", x = 1, xend = 1, y = bracket1_y - bracket1_drop, yend = bracket1_y, color = "black") +
+  annotate("segment", x = 3.5, xend = 3.5, y = bracket2_y + 8, yend = bracket1_y, color = "black") +
+  annotate("text", x = 2.25, y = bracket1_y + 4, label = "***", color = "black", size = 6) +
+
+  # bracket 2 
+  annotate("segment", x = 3, xend = 4, y = bracket2_y, yend = bracket2_y, color = "black") +
+  annotate("segment", x = 3, xend = 3, y = bracket2_y - tip2, yend = bracket2_y, color = "black") +
+  annotate("segment", x = 4, xend = 4, y = bracket2_y - tip2, yend = bracket2_y, color = "black") +
+  annotate("text", x = 3.5, y = bracket2_y + label2_offset, label = "**", color = "black", size = 6) +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    strip.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 16), 
+    axis.text = element_text(size = 14),
+    legend.text = element_text(size = 14), 
+    legend.title = element_text(size = 20)
+  ) + 
+  labs(y = "Tail Angle(\u00B0)",
+       x = NULL)
+```
+# Figure 3: Frequency distibution of tail flare angles
+```{r}
+tail_angles_sub %>% 
+  mutate(treatment_outcome = factor(treatment_outcome, 
+                                    levels = c("Competition (Win)", "Competition (Loss)", "Takeoff", "Landing")),
+         year = ifelse(bird_id %in% paste("Bird", 1:5), "Year 1", "Year 2")) %>%
+  ggplot(aes(x = angle)) +
+  
+  # Individual bird areas
+  # Year 1
+  stat_bin(data = . %>% filter(year == "Year 1"),
+           aes(color = bird_id, fill = bird_id, y = after_stat(count)),
+           binwidth = 5, geom = "line", alpha = 0.5, linewidth = 0.75, position = "identity") + # switch between geom=line and geom=area, will adjust alpha value also 
+  scale_color_manual(name = "Year 1", values = bird_col_y1, labels = paste("Bird", 1:5)) +
+  scale_fill_manual(name = "Year 1", values = bird_col_y1, labels = paste("Bird", 1:5)) +
+  
+  new_scale_color() +
+  new_scale_fill() +
+  
+  # Year 2
+  stat_bin(data = . %>% filter(year == "Year 2"),
+           aes(color = bird_id, fill = bird_id, y = after_stat(count)),
+           binwidth = 5, geom = "line", alpha = 0.5, linewidth = 0.75, position = "identity") +
+  scale_color_manual(name = "Year 2", values = bird_col_y2, labels = paste("Bird", 6:10)) +
+  scale_fill_manual(name = "Year 2", values = bird_col_y2, labels = paste("Bird", 6:10)) +
+  
+  # Black summary line for all birds combined
+  geom_freqpoly(binwidth = 5, color = "black", linewidth = 0.8) +
+  
+  theme_minimal() +
+  labs(x = "Tail Angle(\u00B0)", y = "Count") +
+  facet_wrap(~ treatment_outcome, ncol = 1, scales = "free_y") +
+  theme(
+    legend.position = "right",
+    strip.text = element_text(size = 16),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20),
+    axis.text.x = element_text(size = 16),
+    axis.text.y = element_text(size = 12),
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16)
+  )
+```
+
+# Fig 4: Call and Response of flaring
+a single run of the same length: ch47_ch49_z17
+```{r}
+fig_sm <-  tail_angles_long %>% 
+  filter(time_point <= 1190) %>%
+  mutate(time_point_s = time_point/2000) %>%
+  filter(condition %in% c("ch47_z17_CO_L", "ch49_z17_CO_W")) %>%
+  arrange(bird_id, time_point_s) %>%
+  group_by(bird_id) %>%
+  mutate(angle_smooth = rollmean(angle, k = 5, fill = NA, align = "center")) %>%
+  ungroup()
+
+# points I would like to highlight in winner and loser
+loser_highlight <- c(0.1125, 0.280, 0.400, 0.595)
+winner_highlight <- c(0.0630, 0.235)
+
+loser_highlight_data <- fig_sm %>% 
+  filter(bird_id == "ch47", 
+    time_point_s %in% loser_highlight)
+
+winner_highlight_data <- fig_sm %>% 
+  filter(bird_id == "ch49", 
+    time_point_s %in% winner_highlight)
+```
+
+```{r}
+fig_sm %>% 
+  ggplot(aes(x = (time_point_s*1000), y = angle_smooth, color = bird_id))+
+  geom_line(linewidth = 0.5, alpha =0.6)+ #smoothed data, light to catch tail pumping
+  geom_smooth(method =  "loess", span = 0.15, se = FALSE, linewidth = 1.5) + #trend line
+  scale_color_manual(values = bird_col, labels = c("ch47" = "Loser", 
+                             "ch49" = "Winner"))+
+  labs(x = "Time (ms)",
+       y = "Tail Angle (\u00B0)",
+       color = "Competitor")+ 
+  theme_minimal()+
+  theme(
+    legend.position = "right",
+    strip.text = element_text(size = 24, face = "bold"),
+    axis.title.x = element_text(size = 24),
+    axis.title.y = element_text(size = 24), 
+    axis.text = element_text(size = 18),
+    legend.text = element_text(size = 14), 
+    legend.title = element_text(size = 20)
+  )
+
+```

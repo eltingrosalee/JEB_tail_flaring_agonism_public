@@ -1,0 +1,185 @@
+---
+title: "0_tail_dfs"
+author: "Rosalee Elting"
+date: "2025-07-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Intro
+This Rmd file is to cleanly add all columns needed to tail angle data from 2024 birds. The input data are from .csvs produced by 0_data_onboarding. This Rmd needs to be run before 1_avg_tail_angles.Rmd. 
+
+# Libraries
+```{r, include=FALSE}
+library(tidyverse)
+library(ggExtra)
+library(here)
+library(kableExtra)
+
+```
+
+# Input CSV
+```{r}
+tail_angles_long <- read.csv("2_incremental/tail_spread_angles.csv")
+
+ranks <- read.csv(here("2_incremental", "bird_ranks.csv")) %>% 
+  mutate(bird_id = tolower(bird_id)) %>% #make lowercase
+  select(-X) #X column not needed
+
+run_data <- read.csv(here("0_data", "tail_paper_video_processing_v2.csv")) # this is the same as the OneDrive tail_paper_video_processing.xls
+
+```
+
+# Create variables used in later mutations 
+Max spread angle: assumes some muscular limitation
+```{r}
+angles <- tail_angles_long %>% 
+  filter(!is.na(angle))
+max_angle = max(angles$angle)
+```
+
+find the shortest run's length (for later subsampling)
+```{r}
+min_count <- tail_angles_long %>%
+  filter(!is.na(angle)) %>%
+  count(condition) %>%
+  pull(n) %>%
+  min()
+
+# counts for all runs 
+all_count <- tail_angles_long %>%
+  filter(!is.na(angle)) %>%
+  count(condition)
+```
+# format run information
+```{r}
+run_data <- run_data %>% 
+  select(-c(date, digitized, dlc, tail_qc, igor, comments)) %>% 
+  mutate(
+    bird_id = paste("ch",bird, sep = ""), #bird_id
+    run = str_extract(video, "z\\d+$"), #run
+    treatment = case_when( 
+      str_detect(type, "to") ~ "takeoff",
+      str_detect(type, "la") ~ "landing",
+      str_detect(type, "co") ~ "competition"), 
+    outcome = case_when(
+      str_detect(win_lose, "win") ~ "win",
+      str_detect(win_lose, "lose") ~ "loss",
+      TRUE ~ NA_character_), #outcome and treatment to match tail_angles_long format
+    treatment_outcome = case_when(
+    treatment == "competition" & outcome == "win" ~ "Competition (Win)",
+    treatment == "competition" & outcome == "loss" ~ "Competition (Loss)",
+    treatment == "landing" ~ "Landing",
+    treatment == "takeoff" ~ "Takeoff",
+    TRUE ~ treatment
+    ), # outcome to match tail_angles_long format
+    condition = case_when(
+    treatment == "competition" & outcome == "win" ~ paste0(bird_id, "_", run, "_CO_W"),
+    treatment == "competition" & outcome == "loss" ~ paste0(bird_id, "_", run, "_CO_L"),
+    treatment == "takeoff" ~ paste0(bird_id, "_", run, "_TO"),
+    treatment == "landing" ~ paste0(bird_id, "_", run, "_LA"),
+    TRUE ~ paste0(bird_id, "_", run)  # fallback for any other cases
+  )
+  )%>% 
+  filter(
+    (bird >= 52) |
+      (re.calc_tail_angles == "y")) %>% # only one treatment per bird, from the first RNG version of data, produces 20 entries for 2024. Includes all birds (52-56) from 2025
+  select(-c(bird, type, win_lose))
+```
+
+# balance data set
+Confirm all data (n=40) are frontal approaches
+
+```{r}
+frontal <- run_data %>% 
+  filter(is.na(rear_approach)) %>% 
+  pull(condition)
+```
+
+# create table of run variances 
+```{r}
+run_data_summary <- run_data %>% 
+  select(bird_id, treatment_outcome, cv_bill_length, cv_rump_width, pear_cc)
+
+run_data_summary %>%
+   kable(digits = 2, 
+         col.names = c("Bird ID", "Treatment Outcome", "Bill CV",  "Rump CV", "Rump-Tail Correlation Coefficient"),
+        caption = "Summary Statistics for Digitizing Error", 
+        format = "html") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE,
+                position = "center",
+                font_size = 14) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#4472C4")
+
+run_data_summary
+save_kable(run_data_summary, "./3_results/digitizing_error_table.jpg")
+
+# write as a csv to use in word
+write.csv(run_data_summary, "./2_incremental/digitization_cv_table.csv")
+
+```
+
+# tail_angles_long
+All tail angle data for 2024 and 2025 birds, with variable duration of trials
+```{r}
+tail_angles_long <- tail_angles_long %>%
+    filter(bird_id %in% c("ch47", "ch48", "ch49", "ch50", "ch51", "ch52", "ch53", "ch54", "ch55", "ch56")) %>%  #2024 and 2025 birds
+    filter(condition %in% frontal) %>% #filter to only frontal approaches
+    #filter(condition %in% equal_conditions) %>% #subset for 1 per bird
+    mutate(prop_angle = angle/max_angle) %>% 
+    left_join(ranks, by = "bird_id") %>% 
+    filter(!is.na(angle))   #no flare data, NAs, otherwise all the same length of samples 
+```
+# redefine the min count with only the 24-25 data 
+```{r}
+min_count <- tail_angles_long %>%
+  filter(!is.na(angle)) %>%
+  count(condition) %>%
+  pull(n) %>%
+  min()
+```
+
+# tail_angles_sub
+Subset of tail angles so each run is the same length 
+```{r,  message = FALSE, echo = FALSE}
+set.seed(123)
+
+tail_angles_sub <- tail_angles_long %>% 
+  filter(!is.na(angle))  %>%
+  group_by(condition) %>% 
+  arrange(time_point) %>%
+  mutate(interval = floor(n()/ min_count)) %>% #calculates interval to sample
+  slice(seq(1, n(), by = first(interval))) %>% #every nth point starting from first
+  slice_head(n = min_count) %>% #get exactly min_points, should be very close already
+  mutate(time_point_sub = row_number()/min_count) %>% #row number for subset, goes from 0 to 1, a fraction of way to min count.
+  ungroup()
+# check that all conditions ahve the same nubmer of rows (equals min_count)
+tail_angles_sub %>%
+  count(condition) %>% 
+  print(n=40)
+```
+
+# bird_treatment_angle
+Summary of mean and max tail spread angle for each bird in each trial. From full, not subset, data.
+```{r}
+bird_treatment_angle <- tail_angles_long %>%
+  group_by(bird_id, treatment_outcome) %>% #not condition bc may want to increase n 
+  summarize(mean_angle = mean(angle, na.rm = TRUE),
+            max_angle = max(angle, na.rm = TRUE),
+            sd_angle = sd(angle, na.rm = TRUE),
+            dom_rank = max(dom_rank, na.rm = TRUE),
+            .groups = "drop")
+```
+
+
+# Export all dfs 
+```{r}
+write.csv(tail_angles_long, "./2_incremental/tail_angles_long.csv")
+write.csv(tail_angles_sub, "./2_incremental/tail_angles_sub.csv")
+write.csv(bird_treatment_angle , "./2_incremental/bird_treatment_angle.csv")
+```
+

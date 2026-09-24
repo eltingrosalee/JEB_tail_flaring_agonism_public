@@ -1,0 +1,112 @@
+---
+title: "1_fight_qual_analysis_prep"
+author: "Rosalee Elting"
+date: "2025-08-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# libraries 
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(vcd)
+library(ggplot2)
+library(ggmosaic)
+library(forcats)
+```
+
+# load and process data 
+these data underwent this flow
+OneDrive qualitative description -> cleaning function in fight_qual_clean -> .csv
+
+```{r}
+fights <- read.csv("./2_incremental/fight_qual_processed.csv")
+```
+
+# process data set 
+Function to process data set by 1. creating a row for each bird in a run (adding a column for bird_id), 2. convert behaviors to binary (1 if bird performed, 0 if not)
+```{r}
+# Function to transform fight data from wide to long format with binary behaviors
+transform_fight_data <- function(df) {
+  # List of behavior columns to transform
+  behavior_cols <- c("Chase", "Signal", "Face.to.face", "Spiral", 
+                    "Joust", "Displace", "Retreat","Rear.approach", 
+                    "Side.approach", "Win")
+  
+  # Function to extract bird IDs from fight string
+  extract_bird_ids <- function(fight_str) {
+    # Remove 'CH' or 'Ch' (case insensitive) and extract numbers
+    bird_str <- gsub("(?i)ch", "", fight_str)
+    birds <- unlist(strsplit(bird_str, "_"))
+    birds <- gsub("[^0-9]", "", birds)
+    return(birds)
+  }
+  
+  # Create empty list to store results
+  rows_list <- list()
+  
+  # Process each row
+  for(i in 1:nrow(df)) {
+    row <- df[i,]
+    
+    # Extract bird IDs for this fight
+    bird_ids <- extract_bird_ids(row$Fight)
+    
+    # Create base data
+    base_data <- row[c("Date", "Fight", "Run")]
+    
+    # Process for each bird in the fight
+    for(bird in bird_ids) {
+      new_row <- base_data
+      new_row$bird_id <- paste0("CH", bird)
+      
+      # Process each behavior column
+       for(col in behavior_cols) {
+        if(col == "Win") {
+          # Special handling for win column
+          win_val <- row[["Win"]]
+          if(is.na(win_val) || win_val == "") {
+            new_row[[col]] <- NA #if no winner I've determined from the description, NA
+          } else {
+            # 1 if this bird is the winner, 0 otherwise
+            winning_bird <- gsub("[^0-9]", "", win_val)
+            new_row[[col]] <- as.numeric(bird == winning_bird)
+          }
+        } else {
+          # Handle other behavior columns
+          val <- row[[col]]
+          if(is.na(val) || val == "") {
+            new_row[[col]] <- 0
+          } else {
+            # Split the value if it contains multiple birds
+            birds_in_val <- strsplit(gsub("[^0-9,]", "", as.character(val)), ",")[[1]]
+            new_row[[col]] <- as.numeric(bird %in% birds_in_val)
+          }
+        }
+      }
+      new_row$Frontal.approach <- as.numeric(new_row$Rear.approach == 0 & new_row$Side.approach == 0)
+      rows_list[[length(rows_list) + 1]] <- new_row
+    }
+  }
+  
+  # Combine all rows into a single data frame
+  result <- do.call(rbind, rows_list)
+  rownames(result) <- NULL
+  
+  return(result)
+}
+
+# Example usage:
+# transformed_data <- transform_fight_data(fight_qual)
+```
+
+```{r}
+fights_long <- transform_fight_data(fights)
+write.csv(fights_long, "./2_incremental/fights_long.csv")
+```
+

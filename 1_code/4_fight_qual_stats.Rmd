@@ -1,0 +1,102 @@
+---
+title: "4_fight_qual_stats"
+author: "Rosalee Elting"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+    code_folding: show
+  pdf_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries
+```{r}
+library(tidyverse)
+library(PMCMRplus)
+```
+
+# Import data 
+```{r}
+fights_long <- read.csv("C:/Users/rosal/Documents/R/ProcB_TailFlaring/2_incremental/fights_long.csv")
+```
+
+# Tables of relationship between tail flare and approach angle. 
+table of approach proportions instead of counts to control for pseudoreplication
+```{r}
+individuals <- c("CH47", "CH48", "CH49", "CH50", "CH51", "CH52", "CH53", "CH54", "CH55", "CH56")
+
+fight_summary <- fights_long %>%
+  filter(bird_id %in% individuals) %>% 
+  group_by(bird_id) %>%
+  summarise(
+    prop_signal_rear    = sum(Signal[Rear.approach == 1], na.rm = TRUE) / sum(Rear.approach == 1, na.rm = TRUE),
+    prop_signal_side    = sum(Signal[Side.approach == 1], na.rm = TRUE) / sum(Side.approach == 1, na.rm = TRUE),
+    prop_signal_frontal = sum(Signal[Frontal.approach == 1], na.rm = TRUE) / sum(Frontal.approach == 1, na.rm = TRUE)
+  )
+```
+
+Pivoting table longer
+```{r}
+fight_summary_long <- fight_summary %>%
+  pivot_longer(cols = c(prop_signal_rear, prop_signal_side, prop_signal_frontal),
+               names_to = "approach",
+               values_to = "prop_signaling") %>%
+  filter(!is.nan(prop_signaling)) %>% 
+  filter(!bird_id %in% c("CH50", "CH52")) # ch50 and ch52 do not have samples of rear approach==1, so there is not a representation of all approach angles, let alone if signaling was/wasn't used before. 
+
+
+```
+now three columns for each bird x approach angle combination 
+
+# Statistical analysis of signaling proportion and approach angle 
+## Friedman test 
+Association between tail angle and approach angle. 
+```{r}
+friedman.test(prop_signaling ~ approach | bird_id, data = fight_summary_long)
+```
+## Conover test 
+Which relationships drive this Friedman test result 
+```{r}
+frdAllPairsConoverTest(y = fight_summary_long$prop_signaling, 
+                       groups = fight_summary_long$approach, 
+                       blocks = fight_summary_long$bird_id,
+                       p.adjust.method = "BH")
+
+```
+
+# Statistical analysis of approach angle and win likelihood 
+First, wrangle data 
+```{r}
+individuals <- c("CH47", "CH48", "CH49", "CH50", "CH51", "CH52", "CH53", "CH54", "CH55", "CH56")
+
+fight_summary_2 <- fights_long %>%
+  filter(bird_id %in% individuals) %>% 
+  group_by(bird_id) %>%
+  summarise(
+    prop_win_rear    = sum(Win[Rear.approach == 1], na.rm = TRUE) / sum(Rear.approach == 1, na.rm = TRUE),
+    prop_win_side    = sum(Win[Side.approach == 1], na.rm = TRUE) / sum(Side.approach == 1, na.rm = TRUE),
+    prop_win_frontal = sum(Win[Frontal.approach == 1], na.rm = TRUE) / sum(Frontal.approach == 1, na.rm = TRUE)
+  )
+```
+
+```{r}
+fight_summary_long_2 <- fight_summary_2 %>%
+  pivot_longer(cols = c(prop_win_rear, prop_win_side, prop_win_frontal),
+               names_to = "approach",
+               values_to = "prop_win") %>% 
+  filter(!is.nan(prop_win)) %>% 
+  filter(!bird_id %in% c("CH50", "CH52")) # ch50 and ch52 do not have samples of rear approach==1, let alone the win combination. Omitting these birds for this test also. 
+```
+## Friedman Test
+
+```{r}
+friedman.test(prop_win ~ approach | bird_id, data = fight_summary_long_2)
+```

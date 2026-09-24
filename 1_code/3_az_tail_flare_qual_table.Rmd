@@ -1,0 +1,137 @@
+---
+title: "3_az_tail_flare_qual_table"
+author: "Rosalee Elting"
+date: "2025-10-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Libraries
+```{r}
+library(dplyr)
+library(kableExtra)
+library(ggplot2)
+library(binom)
+library(MetBrewer)
+```
+
+
+#load data 
+```{r}
+az_tails_long <- read.csv("./2_incremental/az_tails_long_clean.csv")
+species <- read.csv("./2_incremental/az_species_list.csv")
+```
+
+# Color Selection
+```{r}
+cat_col <- met.brewer("Nattier")[c(2,3, 5, 7)]
+bird_col <- met.brewer("Juarez", n=10, direction = -1) # formerly Egypt but not enough contrast. 
+contrast_col <- met.brewer("Paquin")[c(3,9)]
+
+# Preview
+par(mfrow=c(3,1))
+scales::show_col(cat_col, labels=FALSE)
+scales::show_col(bird_col, labels=FALSE)
+scales::show_col(contrast_col, labels=FALSE)
+```
+#summary table of tail flaring
+```{r}
+total_contests <- az_tails_long %>% #one total contest data frame, is the same regardless of method
+  filter(qualifier == "manuscript_flaring") %>% 
+  count(species, name = "total_contests")
+
+
+az_flare_summary_ms <- az_tails_long %>% 
+  filter(qualifier == "manuscript_flaring") %>%
+  group_by(species) %>%
+  summarise(total_contests = n(), 
+            contest_with = sum(flaring), 
+            prop_flaring = contest_with/total_contests) %>% 
+  arrange(sort(species)) #can comment out, but sorting by species for later comparison
+  #arrange(desc(prop_flaring))
+
+az_flare_summary_ms
+
+#second table of flaring prevalence if every flaring used, even if it was a startle 
+az_flare_summary_all_flare <- az_tails_long %>% 
+  filter(qualifier == "any_flaring") %>%
+  group_by(species) %>%
+  summarise(total_contests = n(), 
+            contest_with = sum(flaring), 
+            prop_flaring = contest_with/total_contests) %>% 
+  arrange(sort(species)) #can comment out, but sorting by species for later comparison
+  #arrange(desc(prop_flaring))
+
+az_flare_summary_all_flare
+
+#third table where coding is very conservative to not include any incidents where startling even occurred in the video. 
+az_flare_summary_no_startle <- az_tails_long %>% 
+  filter(qualifier == "flare_wo_startle") %>%
+  group_by(species) %>%
+  summarise(total_contests = n(), 
+            contest_with = sum(flaring), 
+            prop_flaring = contest_with/total_contests) %>% 
+  arrange(sort(species)) #can comment out, but sorting by species for later comparison
+  #arrange(desc(prop_flaring))
+
+az_flare_summary_no_startle
+
+# fourth table with a delta value and side by side comparison 
+delta <- az_flare_summary_ms %>% 
+  select(species, discretion_prop = prop_flaring) %>% 
+  left_join(
+    az_flare_summary_no_startle %>% select(species, cautious_prop= prop_flaring), 
+    by = "species") %>% 
+  left_join(total_contests, by = "species") %>% 
+  relocate(total_contests, .after =  species) %>% 
+  mutate(discretion_prop = discretion_prop* 100, 
+         cautious_prop = cautious_prop*100, 
+         delta = cautious_prop- discretion_prop,
+         across(c(discretion_prop, cautious_prop, delta), ~round(.x,2))) %>% 
+  arrange(total_contests) %>% 
+  left_join(az_species, by = "species")
+
+delta
+```
+Save as a .csv for editing in word 
+```{r}
+write.csv(delta, "./2_incremental/az_flaring_summary_Table1_wsensitivity.csv")
+```
+
+# Figure Supp2
+Describe delta values from sensitvity analysis as a figure
+
+```{r}
+ggplot(delta, aes(x=total_contests, y = abs(delta), color=sci_name))+ 
+  geom_point(size = 4)+
+  #ggrepel::geom_text_repel(aes(label = species)) +
+  scale_color_manual(values = bird_col) +
+  theme_minimal()+
+  theme(
+    legend.position = "right",
+    strip.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 16), 
+    axis.text = element_text(size = 14),
+    legend.text = element_text(size = 14, face= "italic"), 
+    legend.title = element_text(size = 20)
+  ) +
+  labs(
+    x = "Bird contest observations (n)",
+    y = "|Δ Flaring Proportion|", 
+    color = "Species"
+  )
+```
+
+
+# which sites 
+```{r}
+species_sites <- az_tails_long %>% 
+  group_by(species)%>% 
+  summarise(
+    sites = paste(unique(site), collapse =", ")
+    )
+```

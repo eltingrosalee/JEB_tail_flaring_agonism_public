@@ -1,0 +1,243 @@
+---
+title: "0_data_onboarding"
+author: "Rosalee Elting"
+date: "2025-03-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is one file that cleans all types of data from 0_data (raw data) and produces products that live in 2_incremental. Those data then could be processed with 1_## code where actual calculations would go.
+
+
+# LAB FIGHT QUALIFICATION 
+Using behavioral coding to characterize tail flaring
+##libraries 
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(vcd)
+library(tibble)
+library(stringr)
+library(lubridate)
+```
+
+##Make a data set 
+Qualitative descriptions of Lab trials 
+```{r}
+
+fight_qual <- read.csv("0_data/Calliope_Fight_Video_Qual_Descriptions_2023_2025.csv") #this is the full csv from OneDrive, includes data from all 3 years
+```
+##Process .csv to clean and export for any manual entry 
+cleaning function
+```{r}
+clean_fight_data <- function(df) {
+  # Function to extract bird numbers from fight column
+  extract_bird_numbers <- function(fight_str) {
+    # Remove 'CH' or 'Ch' (case insensitive) and '_r##' or other suffixes
+    bird_str <- gsub("(?i)ch|_r\\d+", "", fight_str)
+    # Split by underscore and remove any remaining non-numeric characters
+    birds <- unlist(strsplit(bird_str, "_"))
+    birds <- gsub("[^0-9]", "", birds)
+    return(paste(birds, collapse=","))
+  }
+  
+  # Function to get the other bird number
+  get_other_bird <- function(bird_nums, retreating_bird) {
+    birds <- unlist(strsplit(bird_nums, ","))
+    other_bird <- birds[!birds %in% retreating_bird]
+    return(other_bird)
+  }
+  
+  # Behavior columns to process
+  behavior_cols <- c("Chase", "Signal", "Face.to.face", "Spiral", 
+                    "Joust", "Displace", "Retreat")
+  
+  # Create a copy of the dataframe to modify
+  cleaned_df <- df
+  
+  # Add win column
+  cleaned_df$Win <- NA
+  
+  # Process ALL rows
+  for(i in 1:nrow(cleaned_df)) {
+    # Extract bird numbers for this fight
+    bird_nums <- extract_bird_numbers(cleaned_df$Fight[i])
+    
+    # Process each behavior column
+    for(col in behavior_cols) {
+      current_value <- cleaned_df[i, col]
+      
+      # Replace 'X' with bird numbers
+      if(!is.na(current_value) && current_value == "X") {
+        cleaned_df[i, col] <- bird_nums
+      }
+      # Replace 'A' or 'B' with first or second bird number respectively
+      else if(!is.na(current_value)) {
+        if(current_value == "A") {
+          cleaned_df[i, col] <- strsplit(bird_nums, ",")[[1]][1]
+        } else if(current_value == "B") {
+          cleaned_df[i, col] <- strsplit(bird_nums, ",")[[1]][2]
+        }
+      }
+    }
+    
+    # Determine winner based on retreat
+    retreat_value <- cleaned_df$Retreat[i]
+    if(!is.na(retreat_value) && retreat_value != "") {
+      # If the retreat value is numeric (a bird number or comma-separated numbers)
+      if(grepl("^[0-9,]+$", retreat_value)) {
+        # Get the first retreating bird number
+        retreating_bird <- strsplit(retreat_value, ",")[[1]][1]
+        # The winner is the other bird
+        cleaned_df$Win[i] <- get_other_bird(bird_nums, retreating_bird)
+      }
+    }
+  }
+  
+  return(cleaned_df)
+}
+
+# Example usage:
+# cleaned_data <- clean_fight_data(fight_qual)
+```
+## make and export new df
+With cleaned data. Can then import in another script after adding any win data manually. 
+```{r}
+fight_qual_clean <- clean_fight_data(fight_qual)
+
+# select only 2024 and 2025 data
+fight_qual_clean <- fight_qual_clean %>%
+  filter(year(as.Date(Date, format = "%m/%d/%Y")) >= 2024)
+
+# get a sample size of fights 
+fight_qual_clean %>%
+  summarise(n_fights = n_distinct(paste(Date, Fight, Run)))
+
+write.csv(fight_qual_clean, "2_incremental/fight_qual_processed.csv")
+```
+
+#Arizona TAIL FLARE USAGE
+```{r}
+az_tail_qual <- read.csv("./0_data/az_tail_spread_qual.csv")
+```
+
+##process data 
+```{r}
+az_tails <- az_tail_qual %>% 
+  select(-c(path, X)) %>% 
+  filter(!is.na(flaring_present)) %>% #filter out solos
+  rename(manuscript_flaring = flaring_present) %>% # renaming column that is the data from the ms, with startle discretion vs. convservative vs liberal startle consideration 
+  filter(!is.na(vid_name), vid_name != "") # get rid of rows that are empty and fill in with zeros later. 
+
+
+az_tails_long <- az_tails %>% # make longer with the qualifier of what conservatisim is coded. 
+  pivot_longer(
+    cols = c(manuscript_flaring, any_flaring, flare_wo_startle), 
+    names_to = "qualifier", 
+    values_to = "flare_code"
+  )
+
+az_tails_long2 <- az_tails_long %>% 
+    mutate( 
+    species = species1, #first handle species1 column
+    flaring = case_when(
+      flare_code == "x" ~ 1, 
+      flare_code == "1" ~ 1, 
+      flare_code == "2" ~ 0, 
+      TRUE ~ 0 #na or blank
+    )) %>% 
+  select(interaction_id = vid_name, site, species, flaring, qualifier) %>% 
+  bind_rows(
+    az_tails_long %>% 
+      mutate(
+        species = species2, 
+        flaring = case_when(
+          flare_code == "x" ~ 1, 
+          flare_code == "1" ~ 0, 
+          flare_code == "2" ~ 1,
+          TRUE ~ 0
+        )
+      ) %>% 
+      filter(!is.na(vid_name)) %>% #filter out empty rows
+      select(interaction_id = vid_name, site, qualifier, species, flaring)
+  ) %>%
+      arrange(qualifier, interaction_id)
+
+write.csv(az_tails_long2, "./2_incremental/az_tails_long_clean.csv")
+```
+
+##df of all AZ Species 
+To be used in other code as needed
+```{r}
+az_species <- tibble(
+  species = c("an" ,"bc" ,"bb" ,"bl" ,"ru" ,"ca" ,"ri", "be", "bt"),
+  common_name = c("Anna's","Black-chinned", "Broad-billed", "Blue-throated Mountain-gem", "Rufous", "Calliope", "Rivoli's", "Berylline", "Broad-tailed"), 
+  sci_name = c("Calypte anna", "Archilochus alexandri", "Cynanthus latirostris", "Lampornis clemenciae", "Selasphorus rufus", "Selasphorus calliope", "Eugenes fulgens", "Saucerottia beryllina", "Selasphorus platycercus")
+)
+
+write.csv(az_species, "./2_incremental/az_species_list.csv")
+```
+
+
+
+#RANKS
+```{r}
+ranks <- tibble(
+  bird_id = c("CH43", "CH44", "CH45", "CH46", "CH47", "CH48", "CH49", "CH50", "CH51", "CH52","CH53","CH54", "CH55", "CH56"),
+  dom_rank = c(4, 2, 3, 1, 3, 4, 1, 5, 2, 5, 3,2,1,4)
+)
+write.csv(ranks, "./2_incremental/bird_ranks.csv")
+```
+
+#CALLIOPE TAIL SPREAD ANGLES
+```{r}
+tail_angles_raw <- read.csv("./0_data/tail_spread_angles_paper_data_2024_2025.csv") # allows for for negative angles from dot products, includes 2024 and 2025 data (n=10)
+
+# handle some uppercase and some lowercase TO/LA between 2024 and 2025
+names(tail_angles_raw) <- names(tail_angles_raw) %>% 
+  str_replace("_to$", "_TO") %>% 
+  str_replace("_la$", "_LA")
+
+# tidy format
+# Reshape the data from wide to long format
+tail_angles_long <- tail_angles_raw %>%
+  rownames_to_column("time_point") %>%
+  pivot_longer(
+    cols = -time_point,
+    names_to = "condition",
+    values_to = "angle"
+  ) %>%
+  # Extract information from the condition column
+  mutate(
+    time_point = as.numeric(time_point),
+    bird_id = str_extract(condition, "ch\\d+"),
+    treatment = case_when(
+      str_detect(condition, "_TO") ~ "takeoff",
+      str_detect(condition, "_LA") ~ "landing",
+      str_detect(condition, "_CO") ~ "competition"
+    ),
+    outcome = case_when(
+      str_detect(condition, "_CO_W") ~ "win",
+      str_detect(condition, "_CO_L") ~ "loss",
+      TRUE ~ NA_character_
+    ),
+    treatment_outcome = case_when(
+    treatment == "competition" & outcome == "win" ~ "Competition (Win)",
+    treatment == "competition" & outcome == "loss" ~ "Competition (Loss)",
+    treatment == "landing" ~ "Landing",
+    treatment == "takeoff" ~ "Takeoff",
+    TRUE ~ treatment
+  )
+  ) 
+write.csv(tail_angles_long, "2_incremental/tail_spread_angles.csv")
+```
+
+# FRONTAL AREA MORPHOMETRICS
+```{r}
+bird_area <- read.csv("./0_data/calliope_frontal_area.csv")
+```
+
